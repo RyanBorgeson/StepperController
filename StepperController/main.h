@@ -8,15 +8,7 @@
 #ifndef MAIN_H_
 #define MAIN_H_
 
-
-struct ControllerConfig {
-    int speed;
-    int direction;
-};
-
-struct ControllerConfig * controllerConfig;
-
-
+#include "global.h"
 
 void UART0_init(void);
 

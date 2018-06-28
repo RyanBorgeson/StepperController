@@ -1,7 +1,7 @@
-#include "msp.h"
+
 #include <stdlib.h>
 #include <string.h>
-#include "driverlib.h"
+#include "global.h"
 #include "main.h"
 
 /**
@@ -18,6 +18,10 @@ void main(void)
 
     // Allocate memory for the controller configuration
     controllerConfig = (struct ControllerConfig *)calloc(1, sizeof(struct ControllerConfig));
+    cmdBuffer = (char *)calloc(CMD_BUFFER_SIZE, sizeof(char));
+
+    // Set command flag
+    cmdFlag = 0;
 
 	int delay = 10;
 
@@ -29,33 +33,68 @@ void main(void)
     P4->DIR = 0b00111100;
 
     while(1) {
+        // Determines if a command has been entered
+        if (cmdFlag) {
+            cmdFlag = 0;
+            on_commandEntered();
+        }
 
-            P4->OUT |= BIT2 | BIT5;
-            P4->OUT &= ~(BIT3 | BIT4);
-            SysTick_delay(delay);
-            P4->OUT |= BIT4 | BIT5;
-            P4->OUT &= ~(BIT2 | BIT3);
-            SysTick_delay(delay);
-            P4->OUT |= BIT3 | BIT4;
-            P4->OUT &= ~(BIT2 | BIT5);
-            SysTick_delay(delay);
-            P4->OUT |= BIT2 | BIT3;
-            P4->OUT &= ~(BIT4 | BIT5);
-            SysTick_delay(delay);
-            P4->OUT |= BIT2 | BIT5;
-            P4->OUT &= ~(BIT3 | BIT4);
-            SysTick_delay(delay);
-            P4->OUT |= BIT4 | BIT5;
-            P4->OUT &= ~(BIT2 | BIT3);
-            SysTick_delay(delay);
-            P4->OUT |= BIT3 | BIT4;
-            P4->OUT &= ~(BIT2 | BIT5);
-            SysTick_delay(delay);
-            P4->OUT |= BIT2 | BIT3;
-            P4->OUT &= ~(BIT4 | BIT5);
-            SysTick_delay(delay);
+        P4->OUT |= BIT2 | BIT5;
+        P4->OUT &= ~(BIT3 | BIT4);
+        SysTick_delay(delay);
+        P4->OUT |= BIT4 | BIT5;
+        P4->OUT &= ~(BIT2 | BIT3);
+        SysTick_delay(delay);
+        P4->OUT |= BIT3 | BIT4;
+        P4->OUT &= ~(BIT2 | BIT5);
+        SysTick_delay(delay);
+        P4->OUT |= BIT2 | BIT3;
+        P4->OUT &= ~(BIT4 | BIT5);
+        SysTick_delay(delay);
+        P4->OUT |= BIT2 | BIT5;
+        P4->OUT &= ~(BIT3 | BIT4);
+        SysTick_delay(delay);
+        P4->OUT |= BIT4 | BIT5;
+        P4->OUT &= ~(BIT2 | BIT3);
+        SysTick_delay(delay);
+        P4->OUT |= BIT3 | BIT4;
+        P4->OUT &= ~(BIT2 | BIT5);
+        SysTick_delay(delay);
+        P4->OUT |= BIT2 | BIT3;
+        P4->OUT &= ~(BIT4 | BIT5);
+        SysTick_delay(delay);
 
     }
+}
+
+void on_commandEntered(void) {
+    UART_SendString("\n\r");
+    char * delimiter = strchr(cmdBuffer, '=');
+
+    // TODO: Parse command
+    if (delimiter != NULL) {
+        char * pValue = delimiter + 1;
+        char cmd[20];
+        strncpy(cmd, cmdBuffer, pValue - cmdBuffer - 1);
+
+        // Process command
+        if (strncmp(cmd, "speed", 5) == 0) {
+            UART_SendString("Stepper speed is now: ");
+            UART_SendString(pValue);
+            UART_SendString("\n\r");
+        } else if (strncmp(cmd, "direction", 9) == 0) {
+            UART_SendString("Stepper direction is now: ");
+            UART_SendString(pValue);
+            UART_SendString("\n\r");
+        } else {
+            UART_SendString("Command does not exist.");
+            UART_SendString("\n\r");
+        }
+    }
+
+    // Clear command buffer
+    free(cmdBuffer);
+    cmdBuffer = (char *)calloc(CMD_BUFFER_SIZE, sizeof(char));
 }
 
 void SysTick_Init(void)
@@ -80,47 +119,5 @@ void SysTick_delay(uint16_t Delay)
     while((SysTick -> CTRL & 0x00010000) == 0);
 }
 
-void UART_Send(char c) {
-    while(!(EUSCI_A0->IFG & EUSCI_A_IFG_TXIFG));
-    EUSCI_A0->TXBUF = c;
-}
 
-void UART_SendString(char * c) {
-    int i = 0;
-    for (i = 0; i < strlen(c); i++) {
-        UART_Send(c[i]);
-    }
-}
 
-void EUSCIA0_IRQHandler(void) {
-    // Check to see if a byte has been received
-    if (EUSCI_A0->IFG & EUSCI_A_IFG_RXIFG) {
-        char rxBuf = EUSCI_A0->RXBUF;
-
-        // Handle carriage return
-        if (rxBuf == 0x0D) {
-            UART_SendString("\n\r");
-        } else {
-            EUSCI_A0->TXBUF = EUSCI_A0->RXBUF;
-        }
-    }
-    EUSCI_A0->IFG = 0x0000 | EUSCI_A_IFG_TXIFG;
-}
-
-void UART0_init(void) {
-    // Configure UART pins
-    P1->SEL0 |= BIT2 | BIT3;
-
-    // Configure UART
-    EUSCI_A0->CTLW0 |= EUSCI_A_CTLW0_SWRST | EUSCI_A_CTLW0_SSEL__SMCLK;
-    EUSCI_A0->MCTLW &= ~EUSCI_A_MCTLW_OS16;
-    EUSCI_A0->BRW = 312;
-    EUSCI_A0->CTLW0 &= ~EUSCI_A_CTLW0_SWRST;
-
-    // Receive interrupt enable
-    EUSCI_A0->IE |= EUSCI_A_IE_RXIE | EUSCI_A_IE_STTIE;
-    EUSCI_A0->IFG = 0x0000 | EUSCI_A_IFG_TXIFG;
-
-    // Enable the EUSCI_A0 general interrupt
-    Interrupt_enableInterrupt(INT_EUSCIA0);
-}
