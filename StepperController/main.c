@@ -27,7 +27,7 @@ void main(void)
 
     UART_SendString("--- Stepper Controller ---\n\r");
     UART_SendString("speed=[1,2,3,4]\n\r");
-    UART_SendString("direction=[forward,reverse]\n\r");
+    UART_SendString("direction=[1=forward,2=reverse]\n\r");
 
     // Set each port to an output.
     P4->DIR = 0b00111100;
@@ -82,14 +82,22 @@ void on_commandEntered(void) {
             UART_SendString("Stepper speed is now: ");
             UART_SendString(pValue);
             UART_SendString("\n\r");
+
+            controllerConfig->speed = atoi(pValue);
+
         } else if (strncmp(cmd, "direction", 9) == 0) {
             UART_SendString("Stepper direction is now: ");
             UART_SendString(pValue);
             UART_SendString("\n\r");
+
+            controllerConfig->direction = atoi(pValue);
         } else {
             UART_SendString("Command does not exist.");
             UART_SendString("\n\r");
         }
+    } else {
+        UART_SendString("Command does not exist.");
+        UART_SendString("\n\r");
     }
 
     // Clear command buffer
